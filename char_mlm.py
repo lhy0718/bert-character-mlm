@@ -117,13 +117,19 @@ class CharTokenizer():
 
 
 class CharMLMDataset(Dataset):
-    def __init__(self, masked_texts: List[str], label_texts: List[str], data_verifying: bool = False):
+    def __init__(
+        self,
+        masked_texts: List[str],
+        label_texts: List[str],
+        data_verifying: bool = False,
+        tokenizer=CharTokenizer(),
+    ):
         if len(masked_texts) != len(label_texts):
             raise IndexError(
                 f"'masked_texts' and 'label_texts' doesn't have same length. {len(masked_texts)} != {len(label_texts)}"
             )
 
-        self.tokenizer = CharTokenizer()
+        self.tokenizer = tokenizer
 
         batch_encoding = self.tokenizer(masked_texts, desc='Inputs: ')
         labels = self.tokenizer(label_texts, desc='Labels: ')['input_ids']
@@ -147,7 +153,7 @@ class CharMLMDataset(Dataset):
         self.batch_encoding['labels'] = labels
 
     def __len__(self):
-        return len(self.batch_encoding)
+        return len(list(self.batch_encoding.values())[0])
 
     def __getitem__(self, index):
         return{
