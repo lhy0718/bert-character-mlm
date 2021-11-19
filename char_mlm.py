@@ -4,6 +4,7 @@ from typing import Dict, List, Union
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
+from tqdm import tqdm
 from transformers.tokenization_utils_base import BatchEncoding
 
 
@@ -25,9 +26,16 @@ class CharTokenizer():
             'sep_token',
             'mask_token',
         ]
-        for token_name in self.SPECIAL_TOKENS_ATTRIBUTES:
-            setattr(self, token_name, locals()[token_name])
-            setattr(self, token_name + '_id', locals()[token_name + '_id'])
+
+        self.pad_token = pad_token
+        self.pad_token_id = pad_token_id
+        self.cls_token = cls_token
+        self.cls_token_id = cls_token_id
+        self.sep_token = sep_token
+        self.sep_token_id = sep_token_id
+        self.mask_token = mask_token
+        self.mask_token_id = mask_token_id
+
         self.special_tokens_map = {
             token_name: getattr(self, token_name)
             for token_name in self.SPECIAL_TOKENS_ATTRIBUTES
@@ -45,23 +53,20 @@ class CharTokenizer():
 
     def __call__(
         self, texts: Union[List[str], str],
+        desc: str = '',
     ) -> BatchEncoding:
         texts = [texts] if type(texts) == str else texts
+        texts = [self.cls_token + text + self.sep_token for text in texts]
 
-        encoded_text = [
-            self.encode(text) for text in texts
-        ]
+        encoded_text = []
+        for text in tqdm(texts, desc=desc+'Encoding texts...'):
+            encoded_text.append(self.encode(text))
 
         self.input_ids = pad_sequence(encoded_text, batch_first=True)
         self.token_type_ids = torch.zeros_like(
             self.input_ids, dtype=torch.int64)
-        self.attention_mask = torch.zeros_like(
-            self.input_ids, dtype=torch.int64)
-
-        for i, ids in enumerate(self.input_ids):
-            for j, id in enumerate(ids):
-                if id > 0:
-                    self.attention_mask[i][j] = 1
+        self.attention_mask = torch.where(
+            self.input_ids != self.pad_token_id, 1, 0)
 
         return BatchEncoding({
             'input_ids': self.input_ids,
@@ -112,12 +117,39 @@ class CharTokenizer():
 
 
 class CharMLMDataset(Dataset):
-    def __init__(self, masked_texts: List[str], label_texts: List[str]):
+    def __init__(self, masked_texts: List[str], label_texts: List[str], data_verifying: bool = False):
+        if len(masked_texts) != len(label_texts):
+            raise IndexError(
+                f"'masked_texts' and 'label_texts' doesn't have same length. {len(masked_texts)} != {len(label_texts)}"
+            )
+
         self.tokenizer = CharTokenizer()
-        self.batch_encoding =
+
+        batch_encoding = self.tokenizer(masked_texts, desc='Inputs: ')
+        labels = self.tokenizer(label_texts, desc='Labels: ')['input_ids']
+
+        if data_verifying:
+            for m_ids, l_ids in zip(tqdm(batch_encoding['input_ids'], desc='Verifying data...'), labels):
+                m_ids = [id for id in m_ids if id !=
+                         self.tokenizer.pad_token_id]
+                l_ids = [id for id in l_ids if id !=
+                         self.tokenizer.pad_token_id]
+
+                is_not_same_length = len(m_ids) != len(l_ids)
+
+                for m_id, l_id in zip(m_ids, l_ids):
+                    if is_not_same_length or (m_id != l_id and int(m_id) not in self.tokenizer.id2sptoken):
+                        raise IndexError(
+                            f"'masked_text' and 'label_text' aren't same. '{self.tokenizer.decode(m_ids)}' != '{self.tokenizer.decode(l_ids)}'"
+                        )
+
+        self.batch_encoding: BatchEncoding = batch_encoding
+        self.batch_encoding['labels'] = labels
 
     def __len__(self):
-        pass
+        return len(self.batch_encoding)
 
-    def __getitem__(self, index) -> torch.Tensor:
-        pass
+    def __getitem__(self, index):
+        return{
+            key: val[index] for key, val in self.batch_encoding.items()
+        }
