@@ -1,3 +1,3 @@
 # bert-character-mlm
 
-<img width="528" alt="bert-char-mlm" src="https://user-images.githubusercontent.com/11364584/142606222-e5fca973-7dcd-47f9-bd34-634aaa657b4d.png">
+![bert-char-mlm](https://user-images.githubusercontent.com/11364584/142732816-81e1fbe8-c665-4351-bab3-cd00b1659b61.png)
