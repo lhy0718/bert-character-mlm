@@ -71,7 +71,7 @@ class CharTokenizer():
         return BatchEncoding({
             'input_ids': self.input_ids,
             'token_type_ids': self.token_type_ids,
-            'attention_mask': self.attention_mask
+            'attention_mask': self.attention_mask,
         })
 
     def encode(
