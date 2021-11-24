@@ -3,3 +3,4 @@
 !*.ipynb
 !*.py
 !*/*.md
+*test*.*
