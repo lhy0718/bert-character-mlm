@@ -1,10 +1,10 @@
 import re
-from typing import Dict, List, Union
+from typing import List, Union
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 from transformers.tokenization_utils_base import BatchEncoding
 
 
@@ -159,3 +159,25 @@ class CharMLMDataset(Dataset):
         return{
             key: val[index] for key, val in self.batch_encoding.items()
         }
+
+
+def mask_idx(text: str, idx: Union[int, List[int]]) -> str:
+    text = list(text)
+
+    if type(idx) == int:
+        idx = [idx]
+    for i in idx:
+        text[i] = '[MASK]'
+
+    return ''.join(text)
+
+
+def mask_sents(sents_origin: List[str]):
+    sents, sents_masked = [], []
+    for sent in sents_origin:
+        for i in range(len(sent)):
+            if sent[i] == ' ':
+                continue
+            sents_masked.append(mask_idx(sent, i))
+            sents.append(sent)
+    return sents_masked, sents
