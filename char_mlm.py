@@ -1,3 +1,9 @@
+from typing import List
+from flair.data import Sentence
+from flair.embeddings import DocumentEmbeddings
+from transformers import AutoModelForMaskedLM
+import flair
+from bert_character_mlm.char_mlm import CharTokenizer
 import re
 from typing import List, Union
 
@@ -19,6 +25,7 @@ class CharTokenizer():
         sep_token_id: str = 102,
         mask_token: str = '[MASK]',
         mask_token_id: str = 103,
+        verbose: bool = False,
     ):
         self.SPECIAL_TOKENS_ATTRIBUTES = [
             'pad_token',
@@ -48,8 +55,8 @@ class CharTokenizer():
             getattr(self, token_name): getattr(self, token_name + '_id')
             for token_name in self.SPECIAL_TOKENS_ATTRIBUTES
         }
-
         self.char_id_starts = 200
+        self.verbose = verbose
 
     def __call__(
         self, texts: Union[List[str], str],
@@ -59,7 +66,7 @@ class CharTokenizer():
         texts = [self.cls_token + text + self.sep_token for text in texts]
 
         encoded_text = []
-        for text in tqdm(texts, desc=desc+'Encoding texts...'):
+        for text in tqdm(texts, desc=desc+'Encoding texts...', disable=not self.verbose):
             encoded_text.append(self.encode(text))
 
         self.input_ids = pad_sequence(encoded_text, batch_first=True)
@@ -179,3 +186,41 @@ def mask_sents(sents_origin: List[str]):
             sents_masked.append(mask_idx(sent, i))
             sents.append(sent)
     return sents_masked, sents
+
+
+class BertCharMLMDocumentEmbeddings(DocumentEmbeddings):
+    def __init__(
+        self,
+        model: str,
+        layers: str = '-1',
+    ):
+        super().__init__()
+        self.name = 'BertCharMLMDocumentEmbeddings'
+        self.static_embeddings = True
+
+        self.tokenizer = CharTokenizer()
+        self.model = AutoModelForMaskedLM.from_pretrained(
+            model, output_hidden_states=True
+        ).to(flair.device)
+        if layers == 'all':
+            # send mini-token through to check how many layers the model has
+            hidden_states = self.model(torch.tensor(
+                [1], device=flair.device).unsqueeze(0))[-1]
+            self.layer_indexes = [int(x) for x in range(len(hidden_states))]
+        else:
+            self.layer_indexes = [int(x) for x in layers.split(",")]
+
+    @property
+    def embedding_length(self) -> int:
+        return len(self.layer_indexes) * self.model.config.hidden_size
+
+    def _add_embeddings_internal(self, sentences: List[Sentence]) -> List[Sentence]:
+        inputs = self.tokenizer([s.to_original_text()
+                                for s in sentences]).to(flair.device)
+        hidden_states = self.model(**inputs)[-1]
+        for idx, sentence in enumerate(sentences):
+            embeddings_all_layers = [
+                hidden_states[layer][idx][0] for layer in self.layer_indexes
+            ]
+            sentence.set_embedding(self.name, torch.cat(embeddings_all_layers))
+        return sentences
