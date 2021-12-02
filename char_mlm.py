@@ -1,16 +1,14 @@
-from typing import List
-from flair.data import Sentence
-from flair.embeddings import DocumentEmbeddings
-from transformers import AutoModelForMaskedLM
-import flair
-from bert_character_mlm.char_mlm import CharTokenizer
 import re
 from typing import List, Union
 
+import flair
 import torch
+from flair.data import Sentence
+from flair.embeddings import DocumentEmbeddings
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
+from transformers import AutoModelForMaskedLM
 from transformers.tokenization_utils_base import BatchEncoding
 
 
