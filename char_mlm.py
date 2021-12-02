@@ -166,30 +166,11 @@ class CharMLMDataset(Dataset):
         }
 
 
-def mask_idx(text: str, idx: Union[int, List[int]]) -> str:
-    text = list(text)
-    if type(idx) == int:
-        idx = [idx]
-    for i in idx:
-        text[i] = '[MASK]'
-    return ''.join(text)
-
-
-def mask_sents(sents_origin: List[str]):
-    sents, sents_masked = [], []
-    for sent in sents_origin:
-        for i in range(len(sent)):
-            if sent[i] == ' ':
-                continue
-            sents_masked.append(mask_idx(sent, i))
-            sents.append(sent)
-    return sents_masked, sents
-
-
 class BertCharMLMDocumentEmbeddings(DocumentEmbeddings):
     def __init__(
         self,
         model: str,
+        fine_tune: bool = True,
         layers: str = '-1',
     ):
         super().__init__()
@@ -199,7 +180,10 @@ class BertCharMLMDocumentEmbeddings(DocumentEmbeddings):
         self.tokenizer = CharTokenizer()
         self.model = AutoModelForMaskedLM.from_pretrained(
             model, output_hidden_states=True
-        ).to(flair.device)
+        )
+        self.model.eval()
+        self.model.to(flair.device)
+        self.fine_tune = fine_tune
         if layers == 'all':
             # send mini-token through to check how many layers the model has
             hidden_states = self.model(torch.tensor(
@@ -213,12 +197,18 @@ class BertCharMLMDocumentEmbeddings(DocumentEmbeddings):
         return len(self.layer_indexes) * self.model.config.hidden_size
 
     def _add_embeddings_internal(self, sentences: List[Sentence]) -> List[Sentence]:
-        inputs = self.tokenizer([s.to_original_text()
-                                for s in sentences]).to(flair.device)
-        hidden_states = self.model(**inputs)[-1]
-        for idx, sentence in enumerate(sentences):
-            embeddings_all_layers = [
-                hidden_states[layer][idx][0] for layer in self.layer_indexes
-            ]
-            sentence.set_embedding(self.name, torch.cat(embeddings_all_layers))
+        gradient_context = torch.enable_grad() if (
+            self.fine_tune and self.training) else torch.no_grad()
+
+        with gradient_context:
+            inputs = self.tokenizer([s.to_original_text()
+                                    for s in sentences]).to(flair.device)
+            hidden_states = self.model(**inputs)[-1]
+            for idx, sentence in enumerate(sentences):
+                embeddings_all_layers = [
+                    hidden_states[layer][idx][0] for layer in self.layer_indexes
+                ]
+                sentence.set_embedding(
+                    self.name, torch.cat(embeddings_all_layers))
+
         return sentences
