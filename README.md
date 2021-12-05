@@ -10,6 +10,8 @@ character tokenizer using BertTokenizer (uncased)
 
 ```python
 from transformers import AutoTokenizer
+
+MODEL_NAME = 'char-bert-base-uncased'
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 input_ids = tokenizer.encode('uncased string input here.')
 ```
