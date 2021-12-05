@@ -6,12 +6,14 @@ character tokenizer using BertTokenizer (uncased)
 
 ## Usages
 
-### Charcter tokenizer
+### Charcter tokenizer & Character MLM
 
 ```python
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, BertForMaskedLM, BertConfig
 
 MODEL_NAME = 'char-bert-base-uncased'
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-input_ids = tokenizer.encode('uncased string input here.')
+
+config = BertConfig(vocab_size=len(tokenizer))
+model = BertForMaskedLM(config)
 ```
