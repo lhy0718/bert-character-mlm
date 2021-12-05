@@ -12,7 +12,7 @@ character tokenizer using BertTokenizer (uncased)
 from transformers import AutoTokenizer, BertForMaskedLM, BertConfig
 
 MODEL_NAME = 'char-bert-base-uncased'
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
 
 config = BertConfig(vocab_size=len(tokenizer))
 model = BertForMaskedLM(config)
