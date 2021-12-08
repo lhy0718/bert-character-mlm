@@ -1,7 +1,2 @@
-*
-!.gitignore
-!*.ipynb
-!*.py
-!*/*.md
-!legacy/
 *test*.*
+.vscode/
